@@ -35,7 +35,6 @@ RUN update-alternatives --config python
 RUN update-alternatives --remove-all python
 
 RUN ln -s python3.6 /usr/bin/python
-RUN python --version
 RUN python -m pip install -r requirements.txt
 RUN python -m textblob.download_corpora
 RUN python -m nltk.downloader stopwords

@@ -5,3 +5,11 @@ scipy
 scikit-learn
 gensim
 pymongo
+virtualenv
+xmltodict
+bs4
+fuzzywuzzy
+gevent
+flask
+requests
+opencv-python
