@@ -1,0 +1,7 @@
+textblob
+numpy
+pandas
+scipy
+scikit-learn
+gensim
+pymongo
