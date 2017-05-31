@@ -1,76 +1,43 @@
-# Dockerfile for Python whisk docker action
-FROM openwhisk/dockerskeleton
-
-MAINTAINER abiwaxade@gmail.com
+FROM ubuntu:17.04
 
 ENV FLASK_PROXY_PORT 8080
 
-RUN apk --no-cache add gcc g++ libgfortran gfortran make cmake
+RUN apt-get update \
+    && apt-get install -y software-properties-common curl \
+    && apt-get install -y python3.6-dev \
+    && curl -o /tmp/get-pip.py "https://bootstrap.pypa.io/get-pip.py" \
+    && python3.6 /tmp/get-pip.py \
+    && apt-get remove -y curl \
+    && apt autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/include/locale.h /usr/include/xlocale.h
-# Install our action's Python dependencies
-ADD requirements.txt /action/requirements.txt
+# Upgrade and install basic Python dependencies
+RUN apt-get clean autoclean \
+ && apt-get autoremove -y \
+ && rm -rf /var/lib/{apt,dpkg,cache,log}/
 
-#Machine learning packages Install
-RUN mkdir -p /tmp/build \
-&& cd /tmp/build/ \
-&& wget http://www.netlib.org/blas/blas-3.6.0.tgz \
-&& wget http://www.netlib.org/lapack/lapack-3.6.1.tgz \
-&& tar xzf blas-3.6.0.tgz \
-&& tar xzf lapack-3.6.1.tgz \
-&& cd /tmp/build/BLAS-3.6.0/ && gfortran -O3 -std=legacy -m64 -fno-second-underscore -fPIC -c *.f \
-&& ar r libfblas.a *.o && ranlib libfblas.a && mv libfblas.a /tmp/build/. \
-&& cd /tmp/build/lapack-3.6.1/ \
-&& sed -e "s/frecursive/fPIC/g" -e "s/ \.\.\// /g" -e "s/^CBLASLIB/\#CBLASLIB/g" make.inc.example > make.inc \
-&& make lapacklib \
-&& make clean \
-&& mv liblapack.a /tmp/build/. \
-&& cd / \
-&& export BLAS=/tmp/build/libfblas.a \
-&& export LAPACK=/tmp/build/liblapack.a \
-&& cd /action; pip install -r requirements.txt
+RUN mkdir -p /actionProxy
 
+ADD actionproxy.py /actionProxy/
 
-RUN rm -r /action/requirements.txt
+RUN mkdir -p /action
+
+#RUN add-apt-repository --remove ppa:jonathonf/python-3.6
+
+RUN apt-get update  && apt-get install -y \
+libopencv-dev wget unzip cmake make opencv-data
+
+ADD requirements.txt requirements.txt
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.6 10
+RUN update-alternatives --config python
+RUN update-alternatives --remove-all python
+
+RUN ln -s python3.6 /usr/bin/python
+RUN python --version
+RUN python -m pip install -r requirements.txt
 RUN python -m textblob.download_corpora
 RUN python -m nltk.downloader stopwords
-
-#2 Add Edge and bleeding repos
-RUN echo -e '@community http://nl.alpinelinux.org/alpine/edge/community\n@edge http://nl.alpinelinux.org/alpine/edge/main\n@testing http://nl.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories
-
-RUN apk --no-cache add wget libavc1394-dev \
-  libtbb@testing  \
-  libtbb-dev@testing   \
-  libjpeg  \
-  libjpeg-turbo-dev \
-  libpng-dev \
-  libjasper \
-  libdc1394-dev \
-  clang-dev \
-  clang \
-  tiff-dev \
-  libwebp-dev \
-  openblas-dev@community \
-  linux-headers
-
-ENV CC /usr/bin/clang
-ENV CXX /usr/bin/clang++
-
-#Open CV Install
-RUN mkdir /opt && cd /opt && \
-  wget https://github.com/opencv/opencv/archive/3.1.0.zip && \
-  unzip 3.1.0.zip && \
-  cd /opt/opencv-3.1.0 && \
-  mkdir build && \
-  cd build && \
-  cmake -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local -D WITH_FFMPEG=NO \
-  -D WITH_IPP=NO -D WITH_OPENEXR=NO .. && \
-  make VERBOSE=1 && \
-  make && \
-  make install
-
-RUN rm -rf /var/cache/apk/* \
-&& rm -r /tmp/build
-
 
 CMD ["/bin/bash", "-c", "cd actionProxy && python -u actionproxy.py"]
